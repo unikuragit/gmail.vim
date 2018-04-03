@@ -31,7 +31,8 @@ function! gmail#util#response(vp, end, timeout)
   let res = ''
   let end = 0
   while !a:vp.stdout.eof
-    let line = substitute(a:vp.stdout.read(), nr2char(10), '', 'g')
+    let line = substitute(substitute(a:vp.stdout.read(), nr2char(10), nr2char(13), 'g')
+      \ , nr2char(13).nr2char(13), nr2char(13), 'g')
     if line != ''
       let res = res . line
       for line2 in split(line, "\r")
@@ -184,13 +185,13 @@ function! gmail#util#neglect_htmltag()
   :%s/^\s*$//ge
   :%s/\n\n\n//ge
   :%s/&quot;/"/ge
-  :%s/&laquo;/á/ge
-  :%s/&raquo;/â/ge
+  :%s/&laquo;/â‰ª/ge
+  :%s/&raquo;/â‰«/ge
   :%s/&lt;/</ge
   :%s/&gt;/>/ge
   :%s/&amp;/\&/ge
   :%s/&yen;/\\/ge
-  :%s/&cent;/‘/ge
+  :%s/&cent;/Â¢/ge
   :%s/&copy;/c/ge
   :%s/&apos;/'/ge
   :%s/&nbsp;/ /ge
