@@ -45,8 +45,26 @@ function! gmail#smtp#send()
   endif
 endfunction
 
+let g:gmail_smtp_auth = 'nonsec'
+let g:gmail_command_line = {
+  \ 'nonsec':
+  \    {'command':
+  \      ['telnet', substitute(g:gmail_smtp, ':.*$', '', 'g'), substitute(g:gmail_smtp, '^.*:', '', 'g')],
+  \    'rchar':"\n",
+  \    'helo':['HELO LOCALHOST'],
+  \    'auth':[],
+  \    },
+  \ 'sec':
+  \    {'command':
+  \      [g:gmail_command, 's_client', '-connect', g:gmail_smtp, '-quiet'],
+  \    'returnchar':"\r\n",
+  \    'helo':['EHLO LOCALHOST'],
+  \    'auth':['AUTH PLAIN'],
+  \    }
+  \ }
 function! s:sendmail(header, to, messages)
-  let cmd = [g:gmail_command, 's_client', '-connect', g:gmail_smtp, '-quiet']
+  let cmdpre = g:gmail_command_line[g:gmail_smtp_auth]
+  let cmd = cmdpre.command
   let sub = vimproc#popen3(cmd)
   let ret = gmail#util#response(sub, '^\d\d\d ', g:gmail_timeout)
   if empty(ret)
@@ -102,23 +120,43 @@ function! s:sendmail(header, to, messages)
   call extend(contents, split(iconv(join(a:messages[ bidx : ], "\n"), &enc, g:gmail_default_encoding), "\n"))
   call add(contents, "")
 
+  if g:gmail_smtp_auth == 'sec'
   let commands =
     \[
-    \  "EHLO LOCALHOST\r\n",
-    \  "AUTH PLAIN\r\n",
+      \  "EHLO LOCALHOST" . cmdpre.rchar,
+      \  "AUTH PLAIN" . cmdpre.rchar,
     \  AUTH,
-    \  "MAIL FROM:<" . g:gmail_user_name . ">\r\n",
+      \  "MAIL FROM:<" . g:gmail_user_name . ">" . cmdpre.rchar
     \ ]
+  else
+    let commands =
+      \[
+      \  "HELO LOCALHOST" . cmdpre.rchar,
+      \  "MAIL FROM:<" . g:gmail_user_name . ">" . cmdpre.rchar
+      \ ]
+  endif
   for t in a:to
-    call add(commands, "RCPT TO:<" . s:normalize_mail(t) . ">\r\n")
+    let rcpt = s:normalize_mail(t)
+    if rcpt != ''
+      call add(commands, "RCPT TO:<" . rcpt . ">" . cmdpre.rchar)
+    endif
   endfor
 
+  if g:gmail_smtp_auth == 'sec'
   call extend(commands,
     \[
-    \  "DATA\r\n",
-    \  join(contents, "\r\n") . "\r\n.\r\n",
-    \  "QUIT \r\n",
+      \  "DATA" . cmdpre.rchar,
+      \  join(contents, cmdpre.rchar) . cmdpre.rchar . "." . cmdpre.rchar,
+      \  "QUIT" . cmdpre.rchar,
     \])
+  else
+    call extend(commands,
+      \[
+      \  "DATA" . cmdpre.rchar,
+      \  join(contents, cmdpre.rchar) . cmdpre.rchar . "." . cmdpre.rchar,
+      \  "QUIT" . cmdpre.rchar,
+      \])
+  endif
 
   let err = 0
   for command in commands
@@ -154,4 +192,5 @@ function! s:normalize_mail(t)
   let t = substitute(t,   '>.*', '', '')
   return  substitute(t,   ' ', '', 'g')
 endfunction
+
 
