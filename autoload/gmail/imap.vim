@@ -258,6 +258,8 @@ function! gmail#imap#fetch_body(id)
       else
         if cte == s:CTE_7BIT
           call add(list, iconv(r, enc, &enc))
+        elseif cte == s:CTE_PRINTABLE
+          let b64txt .= r . "\n"
         else
           let b64txt .= r
         endif
@@ -295,8 +297,12 @@ function! gmail#imap#fetch_body(id)
     endif
   endfor
 
-  if b64txt != '' && cte == s:CTE_BASE64
-    call extend(list, split(iconv(gmail#util#decodeBase64(b64txt), enc, &enc), nr2char(10)))
+  if b64txt != ''
+    if cte == s:CTE_BASE64
+      call extend(list, split(iconv(gmail#util#decodeBase64(b64txt), enc, &enc), nr2char(10)))
+    elseif cte == s:CTE_PRINTABLE
+      call extend(list, split(iconv(gmail#util#decodeQuotedPrintable(b64txt), enc, &enc), nr2char(10)))
+    endif
   endif
 
   let g:gmail_encoding = enc
