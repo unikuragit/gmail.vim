@@ -6,7 +6,7 @@ let s:gmail_title_prefix = 'gmail-'
 let g:gmail_search_key = 'ALL'
 let s:gmail_winname = [ 'mailbox', 'list', 'body', 'new', 'log' ]
 let s:gmail_list_menu = '   [more] [update] [unread] [read] [archive] [delete]'
-let s:gmail_body_menu = '[next] [prev] [reply] [reply_all] [forward] [unread] [easy_html_view]'
+let s:gmail_body_menu = '[next] [prev] [reply] [reply_all] [forward] [unread] [save_file_all] [easy_html_view]'
 let [ g:GMAIL_MODE_MAILBOX, g:GMAIL_MODE_LIST, g:GMAIL_MODE_BODY, g:GMAIL_MODE_CREATE, g:GMAIL_MODE_LOG ] = range(5)
 let s:gmail_mailbox_item_count = 0
 
@@ -396,6 +396,7 @@ function! gmail#win#update_list(page, clear)
 endfunction
 
 function! gmail#win#click()
+  let head = gmail#imap#get_header()
   let l = line('.')
   if gmail#win#mode() == g:GMAIL_MODE_MAILBOX
     call gmail#win#select_mailbox(l-1)
@@ -421,7 +422,6 @@ function! gmail#win#click()
     endif
   elseif gmail#win#mode() == g:GMAIL_MODE_BODY
     if l == 1
-      let head = gmail#imap#get_header()
       let menu = expand('<cword>')
       if menu == 'next'
         call gmail#win#next()
@@ -444,7 +444,22 @@ function! gmail#win#click()
         endif
       elseif menu == 'easy_html_view'
         call gmail#util#neglect_htmltag()
+      elseif menu == 'save_file_all'
+        if len(head.AttachmentFile) == 0
+          echo "Nothing attachment file."
+        else
+          let savedir = expand('~/')
+          for atfdic in head.AttachmentFile
+            call gmail#util#saveAttachedFile(atfdic.fdata, atfdic.type, savedir . atfdic.fn)
+            echo "Saved " . savedir . atfdic.fn
+          endfor
+        endif
       endif
+    elseif (l - 1) <= len(head.AttachmentFile)
+      let atfdic = head.AttachmentFile[l - 2]
+      let savefile = expand($TMP . '/') . atfdic.fn
+      call gmail#util#saveAttachedFile(atfdic.fdata, atfdic.type, savefile)
+      execute 'tabe ' . savefile
     endif
   elseif gmail#win#mode() == g:GMAIL_MODE_CREATE
     if l == 1

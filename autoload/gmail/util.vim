@@ -121,6 +121,21 @@ function! gmail#util#decodeBase64(data)
   endtry
 endfunction
 
+function! gmail#util#saveAttachedFile(data, type, fname)
+  try
+    let bytes = s:b64decode(split(a:data, '\zs'), s:standard_table, '=')
+    let hexstr = s:bytes2hexstr(bytes)
+      "\ (a:type =~? 'text/plain' ? substitute(hexstr, '\%(\\x00\)\+$', '', '') : hexstr),
+    let hlist = map(split(
+      \ hexstr,
+      \ '\\x0[aA]', 1),
+      \ 'eval(''"'' . substitute(v:val, ''\\x00'', ''\\x0A'', ''g'') . ''"'')')
+    call writefile(hlist, a:fname, 'b')
+  catch /.*/
+    echoerr v:exception
+  endtry
+endfunction
+
 function! s:b64decode(b64, table, pad)
   let a2i = {}
   for i in range(len(a:table))
@@ -137,10 +152,10 @@ function! s:b64decode(b64, table, pad)
     call add(bytes, n % 0x100)
   endfor
   if a:b64[-1] == a:pad
-    unlet a:b64[-1]
+    unlet bytes[-1]
   endif
   if a:b64[-2] == a:pad
-    unlet a:b64[-1]
+    unlet bytes[-1]
   endif
   return bytes
 endfunction
@@ -170,6 +185,10 @@ function! s:bytes2str(bytes)
   return eval('"' . join(map(copy(a:bytes), 'printf(''\x%02x'', v:val)'), '') . '"')
 endfunction
 
+function! s:bytes2hexstr(bytes)
+  return join(map(copy(a:bytes), 'printf(''\x%02x'', v:val)'), '')
+endfunction
+
 function! gmail#util#str2bytes(str)
   return map(range(len(a:str)), 'char2nr(a:str[v:val])')
 endfunction
@@ -185,13 +204,13 @@ function! gmail#util#neglect_htmltag()
   :%s/^\s*$//ge
   :%s/\n\n\n//ge
   :%s/&quot;/"/ge
-  :%s/&laquo;/≪/ge
-  :%s/&raquo;/≫/ge
+  :%s/&laquo;/竕ｪ/ge
+  :%s/&raquo;/竕ｫ/ge
   :%s/&lt;/</ge
   :%s/&gt;/>/ge
   :%s/&amp;/\&/ge
   :%s/&yen;/\\/ge
-  :%s/&cent;/¢/ge
+  :%s/&cent;/ﾂ｢/ge
   :%s/&copy;/c/ge
   :%s/&apos;/'/ge
   :%s/&nbsp;/ /ge
