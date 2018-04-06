@@ -45,7 +45,7 @@ function! gmail#smtp#send()
   endif
 endfunction
 
-let g:gmail_smtp_auth = 'nonsec'
+let g:gmail_smtp_auth = get(g:, 'gmail_smtp_auth', 'sec')
 let g:gmail_command_line = {
   \ 'nonsec':
   \    {'command':
@@ -57,7 +57,7 @@ let g:gmail_command_line = {
   \ 'sec':
   \    {'command':
   \      [g:gmail_command, 's_client', '-connect', g:gmail_smtp, '-quiet'],
-  \    'returnchar':"\r\n",
+  \    'rchar':"\r\n",
   \    'helo':['EHLO LOCALHOST'],
   \    'auth':['AUTH PLAIN'],
   \    }
