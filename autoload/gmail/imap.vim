@@ -201,7 +201,19 @@ function! gmail#imap#fetch_body(id)
     call s:common_error('fetch body', res)
     return []
   endif
+  return s:parse_mail(res[1:-4])
+endfunction
 
+function! gmail#imap#_debug_parse_mail(...) range
+  if a:0 > 0
+    let res = a:1
+  else
+    let res = getline(a:firstline, a:lastline)
+  endif
+  echo s:parse_mail(res)
+endfunction
+
+function! s:parse_mail(res)
   let list = []
   let [ _HEADER, _HEADER_MULTI_MIME_PRE_HEADER, _HEADER_MULTI_MIME_HEADER, _HEADER_MULTI_MIME_BODY, _BODY, _ATTACHMENT_FILE ] = range(6)
   let status = _HEADER
@@ -216,7 +228,7 @@ function! gmail#imap#fetch_body(id)
   let is_atfnsection = 0
   let output_now = 0
   let s:gmail_headers = {'Cc':[], 'AttachmentFile':[]}
-  for r in res[1:-4]
+  for r in a:res
     "echoerr r
     call gmail#win#log(r)
     if status == _HEADER
