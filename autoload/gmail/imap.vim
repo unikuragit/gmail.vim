@@ -225,6 +225,7 @@ function! s:parse_mail(res)
   let atfn = ''
   let isAttachment = 0
   let multipart_mark = 'jijIjeiJ2Ji2j97384jijfwijf'
+  let multipart_mark_alt = 'jijIjeiJ2Ji2j97384jijfwijf'
   let is_atfnsection = 0
   let output_now = 0
   let s:gmail_headers = {'Cc':[], 'AttachmentFile':[]}
@@ -233,21 +234,20 @@ function! s:parse_mail(res)
     call gmail#win#log(r)
     if status == _HEADER
       if r == ''
-        call add(list, s:gmail_body_separator)
-        let status = _BODY
-      elseif r =~ '^Content-type:\s\?'
-        if r =~ '.*boundary=.*'
-          let multipart_mark = '^\V--' . substitute(r,  '^.*boundary=\|"', '', 'g')
+        if type != 'multipart/mixed'
+          call add(list, s:gmail_body_separator)
+          let status = _BODY
         endif
+      elseif r =~ '^Content-type:\s\?'
         let type = s:parse_content_type(r)
 				call gmail#win#log('type is ' . type)
-        if type == 'multipart/mixed'
-          let status = _HEADER_MULTI_MIME_PRE_HEADER
-        endif
         let enc = s:parse_content_type_charset(r)
         call gmail#util#message('encoding is ' . enc)
       elseif r =~ '^Content-Transfer-Encoding:'
         let cte = s:parse_content_transfer_encoding(r)
+      elseif r =~ multipart_mark
+        let status = _HEADER_MULTI_MIME_PRE_HEADER
+      elseif r =~ '.*boundary=.*'
       else
         let coron = stridx(r, ':')
         let key = r[ 0 : coron-1 ]
@@ -277,6 +277,9 @@ function! s:parse_mail(res)
           call add(s:gmail_headers.Cc, substitute(encoded_value, 'Cc:\s\?', '', ''))
         endif
       endif
+      if r =~ '.*boundary=.*'
+        let multipart_mark = '^\V--' . substitute(r,  '^.*boundary=\|"', '', 'g')
+      endif
     elseif status == _BODY
       if r =~ '^--'
         let b64txt = ''
@@ -284,7 +287,7 @@ function! s:parse_mail(res)
         let multipart_mark = r
       else
         if cte == s:CTE_7BIT
-          call add(list, iconv(r, enc, &enc))
+          call add(list, gmail#util#iconv_7bit(r, enc, &enc))
         elseif cte == s:CTE_PRINTABLE
           let b64txt .= r . "\n"
         else
@@ -293,13 +296,22 @@ function! s:parse_mail(res)
       endif
     elseif status == _HEADER_MULTI_MIME_PRE_HEADER
 				call gmail#win#log('mime pre header ')
-      if r =~ '^\s*boundary=.*'
-        let multipart_mark = '^\V--' . substitute(r,  '\s*boundary=\|"', '', 'g')
-				call gmail#win#log('boundary is ' . multipart_mark)
+      if r =~ '^Content-type:'
+        let type = s:parse_content_type(r)
+        let enc = s:parse_content_type_charset(r)
+        call gmail#util#message('content-type is ' . type)
+        if type == 'multipart/alternative'
+        else
+          let status = _HEADER_MULTI_MIME_HEADER
+        endif
       elseif r =~ multipart_mark
+      elseif r =~ multipart_mark_alt
         let status = _HEADER_MULTI_MIME_HEADER
       else
         " ignore this line
+      endif
+      if r =~ '.*boundary=.*'
+        let multipart_mark_alt = '^\V--' . substitute(r,  '^.*boundary=\|"', '', 'g')
       endif
     elseif status == _HEADER_MULTI_MIME_HEADER
 				call gmail#win#log('mime header ')
@@ -331,7 +343,7 @@ function! s:parse_mail(res)
         endif
       endif
     elseif status == _ATTACHMENT_FILE
-      if r == '' || r =~ multipart_mark
+      if r == '' || r =~ multipart_mark || r =~ multipart_mark_alt
         call add(s:gmail_headers.AttachmentFile, {"fn" : atfn, "fdata" : atdata, "type" : type })
         let atdata = ''
         let atfn = ''
@@ -343,11 +355,11 @@ function! s:parse_mail(res)
       endif
     elseif status == _HEADER_MULTI_MIME_BODY
 				call gmail#win#log('mime body ')
-      if r =~ multipart_mark
+      if r =~ multipart_mark || r =~ multipart_mark_alt
         if cte == s:CTE_7BIT
-          call extend(list, split(iconv(b64txt, enc, &enc), nr2char(10)))
+          call extend(list, split(gmail#util#iconv_7bit(b64txt, enc, &enc), nr2char(10)))
         elseif cte == s:CTE_BASE64
-          call extend(list, split(iconv(gmail#util#decodeBase64(b64txt), enc, &enc), nr2char(10)))
+          call extend(list, split(gmail#util#decodeBase64_with_iconv(b64txt, enc, &enc), nr2char(10)))
         elseif cte == s:CTE_PRINTABLE
           call extend(list, split(iconv(gmail#util#decodeQuotedPrintable(b64txt), enc, &enc), nr2char(10)))
         endif
@@ -365,10 +377,14 @@ function! s:parse_mail(res)
 
   if b64txt != ''
     if cte == s:CTE_BASE64
-      call extend(list, split(iconv(gmail#util#decodeBase64(b64txt), enc, &enc), nr2char(10)))
+      call extend(list, split(gmail#util#decodeBase64_with_iconv(b64txt, enc, &enc), nr2char(10)))
     elseif cte == s:CTE_PRINTABLE
       call extend(list, split(iconv(gmail#util#decodeQuotedPrintable(b64txt), enc, &enc), nr2char(10)))
     endif
+  endif
+
+  if atdata != ''
+    call add(s:gmail_headers.AttachmentFile, {"fn" : atfn, "fdata" : atdata, "type" : type })
   endif
 
   let files = []
