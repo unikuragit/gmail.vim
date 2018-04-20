@@ -234,20 +234,19 @@ function! s:parse_mail(res)
     call gmail#win#log(r)
     if status == _HEADER
       if r == ''
-        if type != 'multipart/mixed'
+        if type !~? 'multipart/\%(mixed\|alternative\)'
           call add(list, s:gmail_body_separator)
           let status = _BODY
         endif
-      elseif r =~ '^Content-type:\s\?'
+      elseif r =~? '^Content-type:\s\?'
         let type = s:parse_content_type(r)
-				call gmail#win#log('type is ' . type)
         let enc = s:parse_content_type_charset(r)
         call gmail#util#message('encoding is ' . enc)
-      elseif r =~ '^Content-Transfer-Encoding:'
+      elseif r =~? '^Content-Transfer-Encoding:'
         let cte = s:parse_content_transfer_encoding(r)
       elseif r =~ multipart_mark
         let status = _HEADER_MULTI_MIME_PRE_HEADER
-      elseif r =~ '.*boundary=.*'
+      elseif r =~? '.*boundary=.*'
       else
         let coron = stridx(r, ':')
         let key = r[ 0 : coron-1 ]
@@ -277,25 +276,18 @@ function! s:parse_mail(res)
           call add(s:gmail_headers.Cc, substitute(encoded_value, 'Cc:\s\?', '', ''))
         endif
       endif
-      if r =~ '.*boundary=.*'
+      if r =~? '.*boundary=.*'
         let multipart_mark = '^\V--' . substitute(r,  '^.*boundary=\|"', '', 'g')
       endif
     elseif status == _BODY
-      if r =~ '^--'
-        let b64txt = ''
-        let status = _HEADER_MULTI_MIME_HEADER
-        let multipart_mark = r
+      if cte == s:CTE_7BIT
+        call add(list, gmail#util#iconv_7bit(r, enc, &enc))
+      elseif cte == s:CTE_PRINTABLE
+        let b64txt .= r . "\n"
       else
-        if cte == s:CTE_7BIT
-          call add(list, gmail#util#iconv_7bit(r, enc, &enc))
-        elseif cte == s:CTE_PRINTABLE
-          let b64txt .= r . "\n"
-        else
-          let b64txt .= r
-        endif
+        let b64txt .= r
       endif
     elseif status == _HEADER_MULTI_MIME_PRE_HEADER
-				call gmail#win#log('mime pre header ')
       if r =~ '^Content-type:'
         let type = s:parse_content_type(r)
         let enc = s:parse_content_type_charset(r)
@@ -314,7 +306,6 @@ function! s:parse_mail(res)
         let multipart_mark_alt = '^\V--' . substitute(r,  '^.*boundary=\|"', '', 'g')
       endif
     elseif status == _HEADER_MULTI_MIME_HEADER
-				call gmail#win#log('mime header ')
       if r == '' || r =~ '^Content'
         let is_atfnsection = 0
       endif
@@ -323,8 +314,6 @@ function! s:parse_mail(res)
         let enc = s:parse_content_type_charset(r)
         call gmail#util#message('content-type is ' . type)
       elseif r == ''
-				call gmail#win#log('isAttachment is ' . isAttachment)
-				call gmail#win#log('atfn is ' . atfn)
         if isAttachment == 1 && atfn != ''
           let status = _ATTACHMENT_FILE
         else
@@ -349,12 +338,10 @@ function! s:parse_mail(res)
         let atfn = ''
         let isAttachment = 0
         let status = _HEADER_MULTI_MIME_HEADER
-				call gmail#win#log('write attfile')
       else
         let atdata .= r
       endif
     elseif status == _HEADER_MULTI_MIME_BODY
-				call gmail#win#log('mime body ')
       if r =~ multipart_mark || r =~ multipart_mark_alt
         if cte == s:CTE_7BIT
           call extend(list, split(gmail#util#iconv_7bit(b64txt, enc, &enc), nr2char(10)))
