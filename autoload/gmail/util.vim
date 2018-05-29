@@ -181,18 +181,34 @@ function! gmail#util#decodeBase64_with_iconv(data, fenc, tenc)
   endtry
 endfunction
 
-function! gmail#util#saveAttachedFile(data, type, fname)
+function! gmail#util#saveAttachedFile(data, type, dir, fname)
   try
     let bytes = s:b64decode(split(a:data, '\zs'), s:standard_table, '=')
     let hexstr = s:bytes2hexstr(bytes)
-      "\ (a:type =~? 'text/plain' ? substitute(hexstr, '\%(\\x00\)\+$', '', '') : hexstr),
     let hlist = map(split(
       \ hexstr,
       \ '\\x0[aA]', 1),
       \ 'eval(''"'' . substitute(v:val, ''\\x00'', ''\\x0A'', ''g'') . ''"'')')
-    call writefile(hlist, a:fname, 'b')
+    let savefile = a:dir . a:fname
+    if filewritable(savefile)
+      let prompt = 'Overwrite? [y]es, [c]ancel, [t]imestap : '
+      echo 'Exists ' . savefile
+      let pret = substitute(input(prompt), '^[^:]\+: ', '', '')
+      if pret =~? '^c'
+        echo 'Cancel'
+        return
+      elseif pret =~? '^t'
+        let savefile = a:dir . strftime('%Y%m%d_%H%M%S_') . a:fname
+      elseif pret !~? '^y'
+        echo 'Cancel'
+        return
+      endif
+    endif
+    call writefile(hlist, savefile, 'b')
+    echo "Saved " . savefile
   catch /.*/
     echoerr v:exception
+    return 0
   endtry
 endfunction
 

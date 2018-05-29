@@ -448,18 +448,18 @@ function! gmail#win#click()
         if len(head.AttachmentFile) == 0
           echo "Nothing attachment file."
         else
-          let savedir = expand('~/')
+          let savedir = g:gmail_attachment_file_save_directory
           for atfdic in head.AttachmentFile
-            call gmail#util#saveAttachedFile(atfdic.fdata, atfdic.type, savedir . atfdic.fn)
-            echo "Saved " . savedir . atfdic.fn
+            call gmail#util#saveAttachedFile(atfdic.fdata, atfdic.type, savedir, atfdic.fn)
           endfor
         endif
       endif
     elseif (l - 1) <= len(head.AttachmentFile)
       let atfdic = head.AttachmentFile[l - 2]
-      let savefile = expand($TMP . '/') . atfdic.fn
-      call gmail#util#saveAttachedFile(atfdic.fdata, atfdic.type, savefile)
-      execute 'tabe ' . savefile
+      let dir = fnamemodify(expand($TMP), ':p:h') . (has('win32') ? '\' : '/')
+      let file = fnamemodify(tempname(), ':t:r') . '_' . atfdic.fn
+      call gmail#util#saveAttachedFile(atfdic.fdata, atfdic.type, dir, file)
+      execute 'tabe ' . dir . file
     endif
   elseif gmail#win#mode() == g:GMAIL_MODE_CREATE
     if l == 1

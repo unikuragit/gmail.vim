@@ -54,6 +54,13 @@ if !exists('g:gmail_timeout')
   let g:gmail_timeout = 2000
 endif
 
+if !exists('g:gmail_attachment_file_save_directory')
+  let g:gmail_attachment_file_save_directory = expand('~/')
+endif
+let savedir = g:gmail_attachment_file_save_directory
+let g:gmail_attachment_file_save_directory = ( savedir !~ '/$\|\\$' ? savedir . (has('win32') ? '\' : '/') : savedir )
+unlet savedir
+
 command! -nargs=0 Gmail             :call gmail#start()
 command! -nargs=0 GmailChangeUser   :call gmail#changeUser()
 command! -nargs=0 GmailExit         :call gmail#exit()
