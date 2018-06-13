@@ -455,11 +455,22 @@ function! gmail#win#click()
         endif
       endif
     elseif (l - 1) <= len(head.AttachmentFile)
+      let prompt = 'Open : [e]dit, [s]ystem : '
+      let pret = ( has('windows') ? substitute(input(prompt), '^[^:]\+: ', '', '') : 'e' )
+      if pret !~? '^\%(e\|s\)'
+        echo 'Cancel'
+      endif
       let atfdic = head.AttachmentFile[l - 2]
       let dir = fnamemodify(expand($TMP), ':p:h') . (has('win32') ? '\' : '/')
       let file = fnamemodify(tempname(), ':t:r') . '_' . atfdic.fn
-      call gmail#util#saveAttachedFile(atfdic.fdata, atfdic.type, dir, file)
-      execute 'tabe ' . dir . file
+      let savefile = gmail#util#saveAttachedFile(atfdic.fdata, atfdic.type, dir, file)
+      if savefile != ''
+        if pret =~? '^e'
+          execute 'tabe ' . savefile
+        elseif pret =~? '^s'
+          execute (has('win32') ? ':!start ' : ( has('win32unix') ? ':!cygstart ' : ':! ' )) . savefile
+        endif
+      endif
     endif
   elseif gmail#win#mode() == g:GMAIL_MODE_CREATE
     if l == 1

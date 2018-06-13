@@ -196,19 +196,20 @@ function! gmail#util#saveAttachedFile(data, type, dir, fname)
       let pret = substitute(input(prompt), '^[^:]\+: ', '', '')
       if pret =~? '^c'
         echo 'Cancel'
-        return
+        return ''
       elseif pret =~? '^t'
         let savefile = a:dir . strftime('%Y%m%d_%H%M%S_') . a:fname
       elseif pret !~? '^y'
         echo 'Cancel'
-        return
+        return ''
       endif
     endif
     call writefile(hlist, savefile, 'b')
     echo "Saved " . savefile
+    return savefile
   catch /.*/
     echoerr v:exception
-    return 0
+    return ''
   endtry
 endfunction
 
