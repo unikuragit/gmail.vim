@@ -201,7 +201,7 @@ function! gmail#imap#fetch_body(id)
     call s:common_error('fetch body', res)
     return []
   endif
-  return s:parse_mail(res[1:-4])
+  return s:parse_mail(res[1:-3])
 endfunction
 
 function! gmail#imap#_debug_parse_mail(...) range
